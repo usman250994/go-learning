@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"gostory/user"
 	"io"
 	"net/http"
 )
@@ -16,6 +19,11 @@ func main() {
 		}
 	}()
 
+	userResult := readUsers()
+	createNewUser(userResult)
+}
+
+func readUsers() user.User {
 	res, err := http.Get("https://jsonplaceholder.typicode.com/users")
 	if err != nil {
 		panic(err)
@@ -27,10 +35,40 @@ func main() {
 		panic(err)
 	}
 
-	fmt.Println(string(body))
+	var users []user.User
+	if err := json.Unmarshal(body, &users); err != nil {
+		panic(err)
+	}
 
-	//marshal into []user struct
-	//unmarshal to check
-	//call functions to update
+	fmt.Printf("Number of users: %d\n", len(users))
+	for _, user := range users {
+		fmt.Println(user.GetInfo())
+	}
 
+	return users[0]
+}
+
+func createNewUser(u user.User) {
+	newUser := user.NewUser(250994, u.Name+"-usman", u.Age+1, user.Address{})
+
+	fmt.Printf("Creating new user: %v\n", newUser)
+
+	jsonData, _ := json.Marshal(newUser)
+
+	resp, err := http.Post("https://jsonplaceholder.typicode.com/users",
+		"application/json",
+		bytes.NewBuffer(jsonData))
+
+	if err != nil {
+		panic(err)
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		panic(fmt.Sprintf("Failed to create user: %s", resp.Status))
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	fmt.Println("User created successfully", string(body))
 }
